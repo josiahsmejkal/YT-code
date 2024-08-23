@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        .gradient {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            z-index: -1;
+            top: 0;
+            left: 0;
+            --turn: 0turn;
+            animation: rotate 20s linear infinite;
+            @keyframes rotate {
+                to {
+                    --turn: 1turn;
+                }
+            }
+            background: conic-gradient(from var(--turn, 0turn),
+            #ffafcc 25%,
+            #a2d2ff 25%,
+            #a2d2ff 50%,
+            #bde0fe 50%,
+            #bde0fe 75%,
+            #cdb4db 75%);
+            background-position: center center;
+            --offset-x: calc(var(--x) * 1px);
+            --offset-y: calc(var(--y) * 1px);
+            background-position: calc(100% + var(--offset-x, -50%)) calc(100% + var(--offset-y, -50%));
+            background-size: 200% 200%;
+        }
+        body {
+            display: grid;
+            place-items: center;
+            min-height: 100vh;
+            cursor: crosshair;
+            overflow: hidden;
+        }
+        h1 {
+            font-family: "poppins", sans-serif;
+            font-weight: 800;
+            font-size: 22vw;
+            mix-blend-mode: overlay;
+            line-height: 1;
+            background: linear-gradient(white 15%, black, black, white 95%);
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body>
+    <div class="gradient"></div>
+    <h1>Gradial</h1>
+    <script>
+        document.addEventListener("mousemove", (e) => {
+            document.documentElement.style.setProperty("--x", e.clientX);
+            document.documentElement.style.setProperty("--y", e.clientY);
+        });
+    </script>
+</body>
+</html>
