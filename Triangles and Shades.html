@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        @property --hue {
+            syntax: "<angle>";
+            initial-value: 0deg;
+            inherits: false;
+        }
+        div {
+            box-sizing: border-box;
+            transform-style: preserve-3d;
+        }
+        .cont {
+            --clr: #47ceff;
+            --clr: hsl(var(--hue) 80% 80%);
+            color: var(--clr);
+            filter: drop-shadow(0 0 2vmin currentcolor);
+            animation: clr-chg infinite 10s linear;
+        }
+        @keyframes clr-chg {
+            from {
+                --hue: 0deg;
+            }
+            to {
+                --hue: 360deg;
+            }
+        }
+        .box,
+        .box-inner {
+            --ang: 45deg;
+            width: 40vmin;
+            aspect-ratio: 1;
+            position: relative;
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 5vmin, var(--clr) 5vmin 10vmin);
+            &:before,
+            &:after {
+                position: absolute;
+                inset: 0;
+                content: '';
+                background-image: repeating-linear-gradient(var(--ang), transparent, transparent 5vmin, var(--clr) 5vmin 10vmin);
+            }
+            &:before {
+                transform-origin: bottom left;
+                rotate: x 90deg;
+            }
+            &:after {
+                transform-origin: top left;
+                rotate: x -90deg;
+                --ang: -45deg;
+            }
+        }
+        .box {
+            rotate: 1 1 1 45deg;
+            animation: rot infinite 10s linear;
+        }
+        @keyframes rot {
+            to {
+                transform: rotatex(360deg) rotatey(360deg) rotatez(360deg)
+            }
+        }
+        .box-inner {
+            position: absolute;
+            translate: 0 0 -40vmin;
+            rotate: 1 1 0 180deg;
+        }
+        body {
+            min-height: 100vh;
+            margin: 0;
+            display: grid;
+            place-content: center;
+            background: #333;
+        }
+    </style>
+</head>
+
+
+<body>
+    <div class="cont">
+        <div class="box">
+            <div class="box-inner">
+            </div>
+        </div>
+    </div>
+</body>
+
+
+</html>
