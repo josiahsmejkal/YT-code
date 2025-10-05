@@ -279,6 +279,7 @@
                     <option value="nl">Dutch</option>
                     <option value="sv">Swedish</option>
                     <option value="pl">Polish</option>
+                    <option value="ta">Tamil</option>
                 </select>
             </div>
             
@@ -302,6 +303,7 @@
                     <option value="nl">Dutch</option>
                     <option value="sv">Swedish</option>
                     <option value="pl">Polish</option>
+                    <option value="ta">Tamil</option>
                 </select>
             </div>
         </div>
@@ -356,10 +358,16 @@
                 this.synthesis = window.speechSynthesis;
                 this.isListening = false;
                 this.translationHistory = [];
+                this.translationCache = new Map();
+                this.debounceTimer = null;
+                this.lastTranscript = '';
+                this.isTranslating = false;
+                this.requestQueue = [];
                 
                 this.initElements();
                 this.initSpeechRecognition();
                 this.attachEventListeners();
+                this.preloadVoices();
             }
 
             initElements() {
@@ -385,6 +393,7 @@
                     
                     this.recognition.continuous = true;
                     this.recognition.interimResults = true;
+                    this.recognition.maxAlternatives = 1;
                     this.recognition.lang = 'en-US';
                     
                     this.recognition.onstart = () => {
@@ -409,8 +418,15 @@
                         const displayText = finalTranscript + interimTranscript;
                         this.elements.originalText.textContent = displayText;
                         
+                        // Debounced translation for interim results
+                        if (interimTranscript.trim() && interimTranscript.trim() !== this.lastTranscript) {
+                            this.lastTranscript = interimTranscript.trim();
+                            this.debouncedTranslate(interimTranscript.trim());
+                        }
+                        
+                        // Immediate translation for final results
                         if (finalTranscript) {
-                            this.translateText(finalTranscript.trim());
+                            this.translateText(finalTranscript.trim(), true);
                         }
                     };
                     
@@ -482,43 +498,182 @@
                 }
             }
 
-            async translateText(text) {
-                if (!text.trim()) return;
+            preloadVoices() {
+                // Preload voices for faster access
+                if (this.synthesis.getVoices().length === 0) {
+                    this.synthesis.addEventListener('voiceschanged', () => {
+                        this.voices = this.synthesis.getVoices();
+                    });
+                } else {
+                    this.voices = this.synthesis.getVoices();
+                }
+            }
+
+            debouncedTranslate(text) {
+                // Clear existing timer
+                if (this.debounceTimer) {
+                    clearTimeout(this.debounceTimer);
+                }
                 
-                this.updateStatus('Translating...');
+                // Set new timer for interim results
+                this.debounceTimer = setTimeout(() => {
+                    this.translateText(text, false);
+                }, 200); // 200ms debounce for interim results
+            }
+
+            async translateText(text, isFinal = true) {
+                if (!text.trim() || (this.isTranslating && !isFinal)) return;
+                
+                const sourceLang = this.elements.sourceLang.value === 'auto' ? 'en' : this.elements.sourceLang.value;
+                const targetLang = this.elements.targetLang.value;
+                
+                if (sourceLang === targetLang) {
+                    this.elements.translatedText.textContent = text;
+                    if (isFinal) this.updateStatus('Same language selected. No translation needed.');
+                    return;
+                }
+                
+                // Check cache first
+                const cacheKey = `${sourceLang}-${targetLang}-${text.toLowerCase()}`;
+                if (this.translationCache.has(cacheKey)) {
+                    const cachedTranslation = this.translationCache.get(cacheKey);
+                    this.elements.translatedText.textContent = cachedTranslation;
+                    if (isFinal) {
+                        this.addToHistory(text, cachedTranslation);
+                        this.updateStatus('Translation complete!');
+                    }
+                    return;
+                }
+                
+                this.isTranslating = true;
+                if (isFinal) this.updateStatus('Translating...');
                 
                 try {
-                    // Using a free translation service (MyMemory API)
-                    const sourceLang = this.elements.sourceLang.value === 'auto' ? 'en' : this.elements.sourceLang.value;
-                    const targetLang = this.elements.targetLang.value;
+                    // Use Promise.race for faster response with timeout
+                    const translationPromise = this.fetchTranslation(text, sourceLang, targetLang);
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Translation timeout')), 2500)
+                    );
                     
-                    if (sourceLang === targetLang) {
-                        this.elements.translatedText.textContent = text;
-                        this.updateStatus('Same language selected. No translation needed.');
-                        return;
-                    }
+                    const translation = await Promise.race([translationPromise, timeoutPromise]);
                     
-                    const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`);
-                    const data = await response.json();
-                    
-                    if (data.responseData && data.responseData.translatedText) {
-                        const translation = data.responseData.translatedText;
+                    if (translation) {
                         this.elements.translatedText.textContent = translation;
                         
-                        // Add to history
-                        this.addToHistory(text, translation);
+                        // Cache the result
+                        this.translationCache.set(cacheKey, translation);
                         
-                        this.updateStatus('Translation complete!');
+                        // Limit cache size
+                        if (this.translationCache.size > 100) {
+                            const firstKey = this.translationCache.keys().next().value;
+                            this.translationCache.delete(firstKey);
+                        }
                         
-                        // Auto-play if enabled
-                        setTimeout(() => this.playTranslation(), 500);
-                    } else {
-                        throw new Error('Translation service error');
+                        if (isFinal) {
+                            // Add to history
+                            this.addToHistory(text, translation);
+                            this.updateStatus('Translation complete!');
+                        }
                     }
                 } catch (error) {
                     console.error('Translation error:', error);
-                    this.elements.translatedText.textContent = 'Translation error. Please try again.';
-                    this.updateStatus('Translation failed. Please try again.');
+                    if (isFinal) {
+                        this.elements.translatedText.textContent = 'Translation error. Please try again.';
+                        this.updateStatus('Translation failed. Please try again.');
+                    }
+                } finally {
+                    this.isTranslating = false;
+                }
+            }
+            
+            async fetchTranslation(text, sourceLang, targetLang) {
+                // Use multiple translation services for better reliability and speed
+                const services = [
+                    () => this.translateWithMyMemory(text, sourceLang, targetLang),
+                    () => this.translateWithLibreTranslate(text, sourceLang, targetLang)
+                ];
+                
+                // Try services in parallel for fastest response
+                const promises = services.map(service => 
+                    service().catch(err => {
+                        console.warn('Service failed:', err);
+                        return null;
+                    })
+                );
+                
+                const results = await Promise.allSettled(promises);
+                
+                // Return first successful result
+                for (const result of results) {
+                    if (result.status === 'fulfilled' && result.value) {
+                        return result.value;
+                    }
+                }
+                
+                throw new Error('All translation services failed');
+            }
+            
+            async translateWithMyMemory(text, sourceLang, targetLang) {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000);
+                
+                try {
+                    const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                        },
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) throw new Error('MyMemory API error');
+                    
+                    const data = await response.json();
+                    if (data.responseData && data.responseData.translatedText) {
+                        return data.responseData.translatedText;
+                    }
+                    
+                    throw new Error('Invalid MyMemory response');
+                } catch (error) {
+                    clearTimeout(timeoutId);
+                    throw error;
+                }
+            }
+            
+            async translateWithLibreTranslate(text, sourceLang, targetLang) {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000);
+                
+                try {
+                    const response = await fetch('https://libretranslate.de/translate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            q: text,
+                            source: sourceLang,
+                            target: targetLang,
+                            format: 'text'
+                        }),
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) throw new Error('LibreTranslate API error');
+                    
+                    const data = await response.json();
+                    if (data.translatedText) {
+                        return data.translatedText;
+                    }
+                    
+                    throw new Error('Invalid LibreTranslate response');
+                } catch (error) {
+                    clearTimeout(timeoutId);
+                    throw error;
                 }
             }
 
@@ -534,8 +689,21 @@
                 
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = this.getLanguageCode(this.elements.targetLang.value);
-                utterance.rate = 0.8;
+                utterance.rate = 0.9; // Slightly faster for better responsiveness
                 utterance.pitch = 1;
+                utterance.volume = 1;
+                
+                // Try to use native voice for the language
+                const voices = this.voices || this.synthesis.getVoices();
+                const targetLang = this.elements.targetLang.value;
+                const nativeVoice = voices.find(voice => 
+                    voice.lang.startsWith(targetLang) || 
+                    voice.lang.startsWith(this.getLanguageCode(targetLang).split('-')[0])
+                );
+                
+                if (nativeVoice) {
+                    utterance.voice = nativeVoice;
+                }
                 
                 utterance.onstart = () => {
                     this.updateStatus('Playing translation...');
@@ -594,8 +762,15 @@
                 this.elements.originalText.textContent = 'Click the microphone to start speaking...';
                 this.elements.translatedText.textContent = 'Translation will appear here...';
                 this.translationHistory = [];
+                this.translationCache.clear(); // Clear cache for fresh start
+                this.lastTranscript = '';
                 this.updateHistoryDisplay();
                 this.synthesis.cancel();
+                
+                if (this.debounceTimer) {
+                    clearTimeout(this.debounceTimer);
+                    this.debounceTimer = null;
+                }
                 
                 if (this.isListening) {
                     this.recognition.stop();
@@ -643,6 +818,7 @@
                     'nl': 'nl-NL',
                     'sv': 'sv-SE',
                     'pl': 'pl-PL',
+                    'ta': 'ta-IN',
                     'auto': 'en-US'
                 };
                 return langMap[lang] || 'en-US';

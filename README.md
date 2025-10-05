@@ -4,14 +4,17 @@ A modern, responsive web application that provides real-time voice translation b
 
 ## ✨ Features
 
-- **Real-time Speech Recognition**: Uses browser's built-in Web Speech API
-- **Multi-language Support**: Supports 15+ languages including English, Spanish, French, German, Italian, Portuguese, Russian, Japanese, Korean, Chinese, Arabic, Hindi, Dutch, Swedish, and Polish
-- **Instant Translation**: Real-time translation using MyMemory translation API
-- **Text-to-Speech**: Hear translations spoken in the target language
+- **Real-time Speech Recognition**: Uses browser's built-in Web Speech API with optimized settings
+- **Ultra-Low Latency Translation**: Advanced caching and debouncing for instant results
+- **Multi-language Support**: Supports 16 languages including **Tamil** 
+- **Parallel Translation Services**: Multiple fallback APIs for maximum reliability
+- **Instant Text-to-Speech**: Hear translations with optimized voice selection
+- **Smart Caching**: Remember recent translations for lightning-fast responses
 - **Language Swapping**: Quick swap between source and target languages
-- **Translation History**: Keep track of recent translations
+- **Translation History**: Keep track of recent translations with timestamps
 - **Responsive Design**: Works on desktop, tablet, and mobile devices
 - **Modern UI**: Beautiful glass-morphism design with smooth animations
+- **Performance Optimized**: Debounced interim results and request optimization
 
 ## 🚀 How to Use
 
@@ -39,30 +42,35 @@ A modern, responsive web application that provides real-time voice translation b
 
 ### Features Implementation
 
-#### Speech Recognition
+#### Speech Recognition (Optimized)
 - Uses `SpeechRecognition` or `webkitSpeechRecognition`
-- Continuous listening with interim results
+- **Continuous listening** with interim results and debouncing
+- **Reduced latency** with `maxAlternatives = 1`
 - Automatic language detection option
-- Error handling and user feedback
+- Smart error handling and user feedback
 
-#### Translation Service
-- MyMemory Translation API (free tier)
-- Support for 15+ language pairs
-- Fallback error handling
-- Rate limiting consideration
+#### Translation Service (Enhanced)
+- **Parallel translation APIs** (MyMemory + LibreTranslate)
+- **Smart caching system** with 100+ translation cache
+- **Request timeout optimization** (2.5s max)
+- **Debounced interim translations** (200ms delay)
+- **AbortController** for request cancellation
+- Fallback error handling and retry logic
 
-#### Text-to-Speech
+#### Text-to-Speech (Improved)
 - Browser's built-in `SpeechSynthesis` API
-- Configurable speech rate and pitch
-- Language-specific voice selection
-- Playback controls
+- **Voice preloading** for faster playback
+- **Native voice selection** by language
+- Optimized speech rate (0.9x) and configurable pitch
+- Enhanced playback controls and error handling
 
-#### User Interface
-- Glass-morphism design trend
-- Responsive grid layout
-- Smooth animations and transitions
-- Mobile-first approach
-- Accessibility considerations
+#### User Interface (Performance Focused)
+- **Debounced UI updates** to prevent flicker
+- **Cached DOM references** for faster access
+- Glass-morphism design with GPU acceleration
+- **Smart request queuing** to prevent API spam
+- Responsive layout with mobile optimization
+- Real-time visual feedback and status updates
 
 ## 🎨 Design Features
 
@@ -113,6 +121,7 @@ The application is fully responsive and works great on mobile devices:
 - Dutch (nl)
 - Swedish (sv)
 - Polish (pl)
+- **Tamil (ta)** - *Newly added!*
 
 ## 🎯 Use Cases
 
